@@ -211,10 +211,10 @@ const SignUpPage = () => {
             >
               Sign Up
             </Button>
-            <Typography variant="body1" sx={{ color: theme.palette.text.primary }}>
+            {/* <Typography variant="body1" sx={{ color: theme.palette.text.primary }}>
               or
-            </Typography>
-            <Button
+            </Typography> */}
+            {/* <Button
               fullWidth
               variant="conatined"
               color="secondary"
@@ -222,7 +222,7 @@ const SignUpPage = () => {
               onClick={handleGoogleSignIn}
             >
               Sign up with Gmail
-            </Button>
+            </Button> */}
             <Button
               fullWidth
               variant="text"

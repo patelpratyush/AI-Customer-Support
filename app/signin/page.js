@@ -1,11 +1,11 @@
 'use client';
 
+import { AppBar, Box, Button, Container, CssBaseline, Divider, TextField, Toolbar, Typography } from '@mui/material';
+import { createTheme, ThemeProvider } from '@mui/material/styles';
+import { signInWithEmailAndPassword, signInWithPopup } from 'firebase/auth';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { Box, Button, Container, Typography, TextField, AppBar, Toolbar, CssBaseline, Divider } from '@mui/material';
-import { createTheme, ThemeProvider } from '@mui/material/styles';
 import { auth, provider } from '../../firebase';
-import { signInWithEmailAndPassword, signInWithPopup } from 'firebase/auth';
 
 const theme = createTheme({
   palette: {
@@ -205,10 +205,10 @@ const SignInPage = () => {
             >
               Sign In
             </Button>
-            <Typography variant="body1" sx={{ color: theme.palette.text.primary }}>
+            {/* <Typography variant="body1" sx={{ color: theme.palette.text.primary }}>
               or
-            </Typography>
-            <Button
+            </Typography> */}
+            {/* <Button
               fullWidth
               variant="conatined"
               color="secondary"
@@ -216,7 +216,7 @@ const SignInPage = () => {
               onClick={handleGoogleSignIn}
             >
               Sign in with Gmail
-            </Button>
+            </Button> */}
             <Button
               fullWidth
               variant="text"
