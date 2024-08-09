@@ -1,30 +1,36 @@
 'use client'
 
-import { Box, Button, Stack, TextField } from '@mui/material'
-import { useState, useEffect, useRef } from 'react'
-import { Analytics } from '@vercel/analytics/react'
+import { Box, Button, Stack, TextField, IconButton } from '@mui/material';
+import ThumbUpIcon from '@mui/icons-material/ThumbUp';
+import ThumbDownIcon from '@mui/icons-material/ThumbDown';
+import { useState, useEffect, useRef } from 'react';
+import { Analytics } from '@vercel/analytics/react';
+import { collection, addDoc } from 'firebase/firestore';
+import { db } from './firebase'; 
+import ReactMarkdown from 'react-markdown';
 
 export default function Home() {
   const [messages, setMessages] = useState([
     {
       role: 'assistant',
       content: "Hi! I'm the support assistant. How can I help you today?",
+      feedback: null,
     },
-  ])
-  const [message, setMessage] = useState('')
-  const [isLoading, setIsLoading] = useState(false)
+  ]);
+  const [message, setMessage] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
 
   const sendMessage = async () => {
-    if (!message.trim()) return;  // Don't send empty messages
-    setIsLoading(true)
-  
-    setMessage('')
+    if (!message.trim()) return;
+    setIsLoading(true);
+
+    setMessage('');
     setMessages((messages) => [
       ...messages,
       { role: 'user', content: message },
-      { role: 'assistant', content: '' },
-    ])
-  
+      { role: 'assistant', content: '', feedback: null },
+    ]);
+
     try {
       const response = await fetch('/api/chat', {
         method: 'POST',
@@ -32,54 +38,82 @@ export default function Home() {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify([...messages, { role: 'user', content: message }]),
-      })
-  
+      });
+
       if (!response.ok) {
-        throw new Error('Network response was not ok')
+        throw new Error('Network response was not ok');
       }
-  
-      const reader = response.body.getReader()
-      const decoder = new TextDecoder()
-  
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+
       while (true) {
-        const { done, value } = await reader.read()
-        if (done) break
-        const text = decoder.decode(value, { stream: true })
+        const { done, value } = await reader.read();
+        if (done) break;
+        const text = decoder.decode(value, { stream: true });
         setMessages((messages) => {
-          let lastMessage = messages[messages.length - 1]
-          let otherMessages = messages.slice(0, messages.length - 1)
+          let lastMessage = messages[messages.length - 1];
+          let otherMessages = messages.slice(0, messages.length - 1);
           return [
             ...otherMessages,
             { ...lastMessage, content: lastMessage.content + text },
-          ]
-        })
+          ];
+        });
       }
     } catch (error) {
-      console.error('Error:', error)
+      console.error('Error:', error);
       setMessages((messages) => [
         ...messages,
-        { role: 'assistant', content: "I'm sorry, but I encountered an error. Please try again later." },
-      ])
+        { role: 'assistant', content: "I'm sorry, but I encountered an error. Please try again later.", feedback: null },
+      ]);
     }
-    setIsLoading(false)
-  }
+    setIsLoading(false);
+  };
+
+  const handleFeedback = async (index, feedback) => {
+    const updatedMessages = messages.map((msg, idx) => 
+      idx === index ? { ...msg, feedback } : msg
+    );
+    setMessages(updatedMessages);
+    // Send feedback to the server
+    try {
+      await addDoc(collection(db, 'feedback'), {
+        messageIndex: index,
+        feedback,
+        timestamp: new Date(),
+        messageContent: messages[index].content,
+        userQuestion: messages[index - 1].content,
+      });
+      let feedbackMessage =  {
+        messageIndex: index,
+        feedback,
+        timestamp: new Date(),
+        messageContent: messages[index].content,
+        userQuestion: messages[index - 1].content,
+      };
+      console.log(feedbackMessage);
+      console.log('Feedback submitted successfully');
+    } catch (e) {
+      console.error('Error adding feedback: ', e);
+    }
+  };
 
   const handleKeyPress = (event) => {
     if (event.key === 'Enter' && !event.shiftKey) {
-      event.preventDefault()
-      sendMessage()
+      event.preventDefault();
+      sendMessage();
     }
-  }
+  };
 
-  const messagesEndRef = useRef(null)
+  const messagesEndRef = useRef(null);
 
   const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
-  }
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  };
 
   useEffect(() => {
-    scrollToBottom()
-  }, [messages])
+    scrollToBottom();
+  }, [messages]);
 
   return (
     <Box
@@ -106,25 +140,43 @@ export default function Home() {
           maxHeight="100%"
         >
           {messages.map((message, index) => (
-            <Box
-              key={index}
-              display="flex"
-              justifyContent={
-                message.role === 'assistant' ? 'flex-start' : 'flex-end'
-              }
-            >
+            <Box key={index}>
               <Box
-                bgcolor={
-                  message.role === 'assistant'
-                    ? 'primary.main'
-                    : 'secondary.main'
+                display="flex"
+                justifyContent={
+                  message.role === 'assistant' ? 'flex-start' : 'flex-end'
                 }
-                color="white"
-                borderRadius={16}
-                p={3}
               >
-                {message.content}
+                <Box
+                  bgcolor={
+                    message.role === 'assistant'
+                      ? 'primary.main'
+                      : 'secondary.main'
+                  }
+                  color="white"
+                  borderRadius={16}
+                  p={3}
+                  sx={{
+                    wordBreak: 'break-word', // To wrap long words
+                  }}
+                >
+                  {message.role === 'assistant' ? (
+                    
+                    <ReactMarkdown>{message.content}</ReactMarkdown>
+                  ) : (
+                  message.content)}
+                </Box>
               </Box>
+              {message.role === 'assistant' && message.feedback === null && (
+                <Box display="flex" justifyContent="flex-start" mt={1} ml={2}>
+                  <IconButton onClick={() => handleFeedback(index, 'thumbs_up')}>
+                    <ThumbUpIcon />
+                  </IconButton>
+                  <IconButton onClick={() => handleFeedback(index, 'thumbs_down')}>
+                    <ThumbDownIcon />
+                  </IconButton>
+                </Box>
+              )}
             </Box>
           ))}
           <div ref={messagesEndRef} />
@@ -138,8 +190,8 @@ export default function Home() {
             onKeyPress={handleKeyPress}
             disabled={isLoading}
           />
-          <Button 
-            variant="contained" 
+          <Button
+            variant="contained"
             onClick={sendMessage}
             disabled={isLoading}
           >
@@ -149,5 +201,5 @@ export default function Home() {
       </Stack>
       <Analytics />
     </Box>
-  )
+  );
 }
