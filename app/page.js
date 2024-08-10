@@ -1,6 +1,6 @@
 'use client'
 
-import { Box, Button, Stack, TextField, IconButton } from '@mui/material';
+import { Box, Button, Stack, TextField, IconButton, FormControl, InputLabel, Select, MenuItem } from '@mui/material';
 import ThumbUpIcon from '@mui/icons-material/ThumbUp';
 import ThumbDownIcon from '@mui/icons-material/ThumbDown';
 import { useState, useEffect, useRef } from 'react';
@@ -17,8 +17,24 @@ export default function Home() {
       feedback: null,
     },
   ]);
+
+  const models = [
+    { value: 'meta-llama/llama-3.1-8b-instruct:free', label: 'Llama 3.1' },
+    { value: 'qwen/qwen-2-7b-instruct:free', label: 'Qwen 2' },
+    { value: 'google/gemma-2-9b-it:free', label: 'Google: Gemma 2' },
+    { value: 'mistralai/mistral-7b-instruct:free', label: 'Mistral 7B' },
+    { value: 'microsoft/phi-3-mini-128k-instruct:free', label: 'Phi-3 Mini' },
+  ];
+
   const [message, setMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [selectedModel, setSelectedModel] = useState(models[0].value); // Default model
+
+  
+
+  const handleModelChange = (event) => {
+    setSelectedModel(event.target.value);
+  };
 
   const sendMessage = async () => {
     if (!message.trim()) return;
@@ -37,7 +53,9 @@ export default function Home() {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify([...messages, { role: 'user', content: message }]),
+        body: JSON.stringify({
+          messages:[...messages, { role: 'user', content: message }],
+          model: selectedModel,}),
       });
 
       if (!response.ok) {
@@ -132,6 +150,20 @@ export default function Home() {
         p={2}
         spacing={3}
       >
+        <FormControl fullWidth>
+          <InputLabel>Select Model</InputLabel>
+          <Select
+          value ={selectedModel}
+          onChange={handleModelChange}
+          label="Select Model"
+          >
+            {models.map((model) => (
+              <MenuItem key={model.value} value={model.value}>
+                {model.label}
+              </MenuItem>
+            ))}
+          </Select>
+        </FormControl>
         <Stack
           direction={'column'}
           spacing={2}
