@@ -1,29 +1,34 @@
 'use client'
 
-import React, { useState, useRef, useEffect } from 'react';
+import { auth, firestore } from '@/firebase';
+import { AccountCircle, Logout, Send } from '@mui/icons-material';
+import ThumbDownIcon from '@mui/icons-material/ThumbDown';
+import ThumbUpIcon from '@mui/icons-material/ThumbUp';
 import {
   AppBar,
-  Toolbar,
-  Typography,
+  Box,
   Button,
   Container,
-  Box,
-  IconButton,
-  TextField,
-  Stack,
+  FormControl,
   Grow,
+  IconButton,
+  InputLabel,
   Menu,
   MenuItem,
+  Select,
+  Stack,
+  TextField,
+  Toolbar,
+  Typography,
 } from '@mui/material';
-import { AccountCircle, Logout, Send } from '@mui/icons-material';
-import ReactMarkdown from 'react-markdown';
-import remarkGfm from 'remark-gfm';
-import rehypeHighlight from 'rehype-highlight';
+import { Analytics } from "@vercel/analytics/react";
+import { onAuthStateChanged, signOut } from 'firebase/auth';
 import 'highlight.js/styles/github-dark.css'; // GitHub dark theme for code highlighting
 import { useRouter } from 'next/navigation';
-import { signOut, onAuthStateChanged } from 'firebase/auth';
-import { firestore, auth } from '@/firebase';
-import { Analytics } from "@vercel/analytics/react";
+import React, { useEffect, useRef, useState } from 'react';
+import ReactMarkdown from 'react-markdown';
+import rehypeHighlight from 'rehype-highlight';
+import remarkGfm from 'remark-gfm';
 import withAuth from '../protectedRoute';
 
 
@@ -32,8 +37,19 @@ const ChatPage = () => {
     {
       role: 'assistant',
       content: "Hi there! I'm your coding companion. How can I assist you with your code today?",
+      feedback: null,
     },
   ])
+
+  const models = [
+    { value: 'meta-llama/llama-3.1-8b-instruct:free', label: 'Llama 3.1' },
+    { value: 'qwen/qwen-2-7b-instruct:free', label: 'Qwen 2' },
+    { value: 'google/gemma-2-9b-it:free', label: 'Google: Gemma 2' },
+    { value: 'mistralai/mistral-7b-instruct:free', label: 'Mistral 7B' },
+    { value: 'microsoft/phi-3-mini-128k-instruct:free', label: 'Phi-3 Mini' },
+  ];
+
+
   // State to store the current message input by the user
   const [message, setMessage] = useState('');
   // State to indicate whether a message is being processed
@@ -50,6 +66,16 @@ const ChatPage = () => {
   const [loading, setLoading] = useState(false);
   // Initialize router
   const router = useRouter();
+  const [attachmentAnchorEl, setAttachmentAnchorEl] = useState(null);
+  const [attachments, setAttachments] = useState([]);
+  const [linkDialogOpen, setLinkDialogOpen] = useState(false);
+  const [linkInput, setLinkInput] = useState('');
+  const fileInputRef = useRef(null);
+  const [selectedModel, setSelectedModel] = useState(models[0].value); // Default model
+
+  const handleModelChange = (event) => {
+    setSelectedModel(event.target.value);
+  };
 
   const userandplaceholdermsg = (message, setMessages) => {
     setMessages((prevMessages) => [
@@ -84,6 +110,38 @@ const ChatPage = () => {
         ];
       });
     };
+  
+    // Handles the attachment button click event to open the attachment menu.
+    const handleAttachmentClick = (event) => {
+      event.stopPropagation(); // Prevent event bubbling
+      setAttachmentAnchorEl(event.currentTarget);
+    };
+
+    const handleAttachmentMenuClose = () => {
+      setAttachmentAnchorEl(null);
+    };
+    
+    // Handles the file attachment event and adds the files to the attachments state.
+    const handleFileAttachment = (event) => {
+      const files = Array.from(event.target.files);
+      setAttachments([...attachments, ...files.map(file => ({ type: 'file', content: file }))]);
+      handleAttachmentMenuClose();
+    };
+
+    // Handles the link attachment event and adds the link to the attachments state.
+    const handleLinkAttachment = () => {
+      setLinkDialogOpen(true);
+      handleAttachmentMenuClose();
+    };
+
+    // Handles the link input change event to update the link input state.
+    const handleLinkSubmit = () => {
+      if (linkInput.trim()) {
+        setAttachments([...attachments, { type: 'link', content: linkInput.trim() }]);
+        setLinkInput('');
+      }
+      setLinkDialogOpen(false);
+    };
 
     // Handles any errors that occur during the fetch request.
   const handleError = (setMessages) => {
@@ -98,36 +156,66 @@ const ChatPage = () => {
 
   // Sends the user's message to the server and processes the response.
   const sendMessage = async () => {
-    // Prevent sending empty messages or if already loading
     if (!message.trim() || isLoading) return;
-    setIsLoading(true); // Set loading state to true
 
-    // Add user message and a placeholder for the assistant's response
-    userandplaceholdermsg(message, setMessages);
+    setIsLoading(true); // Set loading state to true
     setMessage(''); // Clear the input field
 
+    // Add user message and a placeholder for the assistant's response
+    setMessages((messages) => [
+        ...messages,
+        { role: 'user', content: message },
+        { role: 'assistant', content: '', feedback: null },
+    ]);
+
     try {
-      // Send the user message to the server
-      const response = await fetch('/api/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([...messages, { role: 'user', content: message }]),
-      });
+        // Prepare form data with attachments
+        const formData = new FormData();
+        formData.append('message', message);
+        formData.append('model', selectedModel);
+        attachments.forEach((attachment, index) => {
+            if (attachment.type === 'file') {
+                formData.append(`file${index}`, attachment.content);
+            } else {
+                formData.append(`link${index}`, attachment.content);
+            }
+        });
 
-      // Check if the network response is OK
-      if (!response.ok) throw new Error('Network response was not ok');
+        const response = await fetch('/api/chat', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                messages: [...messages, { role: 'user', content: message }],
+                model: selectedModel,
+            }),
+        });
 
-      // Read and decode the stream of data from the server
-      const reader = response.body.getReader();
-      const decoder = new TextDecoder();
+        if (!response.ok) throw new Error('Network response was not ok');
 
-      // Process the server response stream
-      await handleServerResponse(reader, decoder, setMessages);
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+
+        while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            const text = decoder.decode(value, { stream: true });
+            setMessages((messages) => {
+                let lastMessage = messages[messages.length - 1];
+                let otherMessages = messages.slice(0, messages.length - 1);
+                return [
+                    ...otherMessages,
+                    { ...lastMessage, content: lastMessage.content + text },
+                ];
+            });
+        }
     } catch (error) {
-      console.error('Error:', error);
-
-      // Handle any errors by displaying an error message
-      handleError(setMessages);
+        console.error('Error:', error);
+        setMessages((messages) => [
+            ...messages,
+            { role: 'assistant', content: "I'm sorry, but I encountered an error. Please try again later.", feedback: null },
+        ]);
     }
 
     setIsLoading(false); // Reset loading state to false
@@ -141,6 +229,34 @@ const ChatPage = () => {
     }
   }
 
+  const handleFeedback = async (index, feedback) => {
+    const updatedMessages = messages.map((msg, idx) => 
+      idx === index ? { ...msg, feedback } : msg
+    );
+    setMessages(updatedMessages);
+    // Send feedback to the server
+    try {
+      await addDoc(collection(db, 'feedback'), {
+        messageIndex: index,
+        feedback,
+        timestamp: new Date(),
+        messageContent: messages[index].content,
+        userQuestion: messages[index - 1].content,
+      });
+      let feedbackMessage =  {
+        messageIndex: index,
+        feedback,
+        timestamp: new Date(),
+        messageContent: messages[index].content,
+        userQuestion: messages[index - 1].content,
+      };
+      console.log(feedbackMessage);
+      console.log('Feedback submitted successfully');
+    } catch (e) {
+      console.error('Error adding feedback: ', e);
+    }
+  };
+  
   const messagesEndRef = useRef(null)
 
   const scrollToBottom = () => {
@@ -233,6 +349,49 @@ const ChatPage = () => {
             {/* <Typography variant="h5" paragraph align="center" style={{ color: '#b0b0b0' }}>
               Our AI-powered assistant is here to help you with all your customer service needs. Get instant answers and personalized support.
             </Typography> */}
+            {/* Model selection dropdown */}
+            <Box mt={4} mb={2} display="flex" justifyContent="center">
+              <FormControl sx={{ width: '300px' }}>
+                <InputLabel>Select Model</InputLabel>
+                <Select
+                  value={selectedModel}
+                  onChange={handleModelChange}
+                  label="Select Model"
+                  sx={{
+                    backgroundColor: '#333',
+                    color: 'white',
+                    borderRadius: '50px',  // Matching the rounded corners
+                    '& .MuiOutlinedInput-root': {
+                      borderRadius: '50px', // Ensures the border is also rounded
+                      '& fieldset': {
+                        borderColor: '#555',
+                      },
+                      '&:hover fieldset': {
+                        borderColor: '#777',
+                      },
+                      '&.Mui-focused fieldset': {
+                        borderColor: 'white',
+                      },
+                    },
+                    '& .MuiInputBase-input': {
+                      color: 'white',
+                    },
+                    '& .MuiInputLabel-root': {
+                      color: '#aaa',
+                    },
+                    '& .MuiInputLabel-root.Mui-focused': {
+                      color: 'white',
+                    },
+                  }}
+                >
+                  {models.map((model) => (
+                    <MenuItem key={model.value} value={model.value}>
+                      {model.label}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+            </Box>
             <Box mt={4} display="flex" justifyContent="center">
               <TextField
                 variant="outlined"
@@ -362,6 +521,17 @@ const ChatPage = () => {
                     >
                       {msg.content}
                     </ReactMarkdown>
+                    {/* Feedback buttons for assistant messages */}
+                    {msg.role === 'assistant' && msg.feedback === null && (
+                      <Box display="flex" justifyContent="flex-start" mt={1} ml={2}>
+                        <IconButton onClick={() => handleFeedback(index, 'thumbs_up')}>
+                          <ThumbUpIcon style={{ color: 'white' }} />
+                        </IconButton>
+                        <IconButton onClick={() => handleFeedback(index, 'thumbs_down')}>
+                          <ThumbDownIcon style={{ color: 'white' }} />
+                        </IconButton>
+                      </Box>
+                    )}
                   </Box>
                 ))}
                 {/* Reference to scroll to the bottom */}

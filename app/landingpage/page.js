@@ -73,7 +73,7 @@ const features = [
 	{
 		icon: <AutoAwesome style={{ fontSize: 30, marginBottom: 10, color: 'white' }} />,
 		title: 'Personalized Recommendations',
-		description: 'Our AI assistant can provide personalized product recommendations and support based on your needs.'
+		description: 'Our AI assistant can provide personalized code recommendations and support based on your needs.'
 	}
 ];
 
@@ -179,10 +179,10 @@ const LandingPage = () => {
 			}}>
 				<Container maxWidth="md">
 					<Typography variant="h3" fontWeight="bold" gutterBottom>
-						Effortless Customer Service with AI
+						Effortless Coding Assistance with AI
 					</Typography>
 					<Typography variant="h6" sx={{ mb: 4 }}>
-						Our AI-powered assistant is here to help you with all your customer service needs. Get instant answers and personalized support.
+						Our AI-powered assistant is here to help you with all your programming needs. Get instant answers and personalized support.
 					</Typography>
 					<Button
 						onClick={handleSignUp}

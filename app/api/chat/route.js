@@ -64,12 +64,12 @@ const openai = new OpenAI({
 
 // POST function to handle incoming requests
 export async function POST(req) {
-  const data = await req.json(); // Parse the JSON body of the incoming request
+  const {messages , model} = await req.json(); // Parse the JSON body of the incoming request
 
   // Create a chat completion request to the OpenAI API via OpenRouter
   const completion = await openai.chat.completions.create({
-    model: "meta-llama/llama-3.1-8b-instruct:free", // Specify the model to use
-    messages: [{ role: 'system', content: systemPrompt }, ...data], // Include the system prompt and user messages
+    model: model || "meta-llama/llama-3.1-8b-instruct:free", // Specify the model to use
+    messages: [{ role: 'system', content: systemPrompt }, ...messages], // Include the system prompt and user messages
     stream: true, // Enable streaming responses
   });
 
