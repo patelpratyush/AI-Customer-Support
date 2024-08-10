@@ -27,7 +27,7 @@ const ChatPage = () => {
    const models = [
     { value: 'meta-llama/llama-3.1-8b-instruct:free', label: 'Llama 3.1' },
     { value: 'qwen/qwen-2-7b-instruct:free', label: 'Qwen 2' },
-    { value: 'google/gemma-2-9b-it:free', label: 'Google: Gemma 2' },
+    { value: 'google/gemma-2-9b-it:free', label: 'Gemma 2' },
     { value: 'mistralai/mistral-7b-instruct:free', label: 'Mistral 7B' },
     { value: 'microsoft/phi-3-mini-128k-instruct:free', label: 'Phi-3 Mini' },
   ];
@@ -287,8 +287,8 @@ const ChatPage = () => {
                 ref={inputRef}
               />
             </Box>
-            <Box sx={{ marginLeft: '-400px', marginTop: '10px'}}>
-              <FormControl sx={{ width: '200px', marginTop: '20px' }}>
+            <Box sx={{ marginTop: '10px'}}>
+              <FormControl sx={{ width: '150px', marginTop: '20px' }}>
                   <InputLabel 
                     id="model-select-label" 
                     sx={{ 
