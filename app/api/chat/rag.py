@@ -45,8 +45,8 @@ class RAG:
         
         # Initialize Pinecone
         self.pinecone = Pinecone(api_key=self.pinecone_api_key, user_agent=self.user_agent)
-        self.index_name = "youtube-video-chatbot-openai"
-        self.namespace = "youtube-videos"
+        self.index_name = "code-assistant"
+        self.namespace = "documentation"    
         self.vectorstore = None
         self.pinecone_index = self.pinecone.Index(self.index_name)
         
@@ -65,15 +65,19 @@ class RAG:
         embedding1 = np.array(self.get_embedding(word1)).reshape(1, -1)
         embedding2 = np.array(self.get_embedding(word2)).reshape(1, -1)
         
-        print("Embedding for Word 1:", embedding1)
-        print("\nEmbedding for Word 2:", embedding2)
-        
         similarity = cosine_similarity(embedding1, embedding2)
         return similarity[0][0]
 
-    def load_youtube_video(self, youtube_url):
-        """Load video data from YouTube and split it into chunks."""
-        loader = YoutubeLoader.from_youtube_url(youtube_url, add_video_info=True)
+    def load_pdf(self, pdf_path):
+        """Load data from a PDF file and split it into chunks."""
+        loader = UnstructuredPDFLoader(pdf_path)
+        data = loader.load()
+        texts = self.text_splitter.split_documents(data)
+        return texts
+
+    def load_web_content(self, url):
+        """Load data from a web page and split it into chunks."""
+        loader = WebBaseLoader(url)
         data = loader.load()
         texts = self.text_splitter.split_documents(data)
         return texts
@@ -87,7 +91,7 @@ class RAG:
             namespace=self.namespace
         )
 
-    def perform_rag(self, query):
+    def perform_rag(self, query, model):
         """Perform Retrieval-Augmented Generation using OpenAI."""
         query_embedding = self.get_embedding(query)
         
@@ -107,7 +111,7 @@ class RAG:
         system_prompt = """You are an expert personal assistant. Answer any questions I have about the Youtube Video provided. You always answer questions based only on the context that you have been provided."""
         
         res = self.openrouter_client.chat.completions.create(
-            model="qwen/qwen-2-7b-instruct:free",
+            model=model,
             messages=[
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": augmented_query}
@@ -116,11 +120,18 @@ class RAG:
         
         return res.choices[0].message.content
 
-def main():
+def main(pdf_path=None, url=None):
     rag = RAG()
-    youtube_texts = rag.load_youtube_video("https://www.youtube.com/watch?v=ArcI4A5nvBo")
-    rag.setup_vectorstore(youtube_texts)
-    response = rag.perform_rag("What is the main topic discussed in the video?")
+
+    if pdf_path:
+        texts = rag.load_pdf(pdf_path)
+    elif url:
+        texts = rag.load_web_content(url)
+    else:
+        raise ValueError("Either pdf_path or url must be provided")
+    
+    rag.setup_vectorstore(texts)
+    response = rag.perform_rag("What is the main topic discussed in the document?", "qwen/qwen-2-7b-instruct:free")
     print(response)
 
 if __name__ == "__main__":

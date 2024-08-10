@@ -69,63 +69,71 @@ const ChatPage = () => {
     ]);
   };
 
-    // Handles the server response stream and updates the assistant's message.
-    const handleServerResponse = async (reader, decoder, setMessages) => {
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break; // Exit the loop if the stream is finished
+  // Handles the server response stream and updates the assistant's message.
+  const handleServerResponse = async (reader, decoder, setMessages) => {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break; // Exit the loop if the stream is finished
+
+      // Decode the chunk and update the assistant's message content
+      const text = decoder.decode(value, { stream: true });
+      updateLastMessage(text, setMessages);
+    }
+  };
+
+  // Updates the content of the last message in the messages array.
+  const updateLastMessage = (text, setMessages) => {
+    setMessages((prevMessages) => {
+      let lastMessage = prevMessages[prevMessages.length - 1];
+      let otherMessages = prevMessages.slice(0, prevMessages.length - 1);
+
+      // Append the new text to the last message content
+      return [
+        ...otherMessages,
+        { ...lastMessage, content: lastMessage.content + text },
+      ];
+    });
+  };
+
+  // Handles the attachment button click event to open the attachment menu.
+  const handleAttachmentClick = (event) => {
+    event.stopPropagation(); // Prevent event bubbling
+    setAttachmentAnchorEl(event.currentTarget);
+  };
+
+  const handleAttachmentMenuClose = () => {
+    setAttachmentAnchorEl(null);
+  };
   
-        // Decode the chunk and update the assistant's message content
-        const text = decoder.decode(value, { stream: true });
-        updateLastMessage(text, setMessages);
-      }
-    };
-  
-    // Updates the content of the last message in the messages array.
-    const updateLastMessage = (text, setMessages) => {
-      setMessages((prevMessages) => {
-        let lastMessage = prevMessages[prevMessages.length - 1];
-        let otherMessages = prevMessages.slice(0, prevMessages.length - 1);
-  
-        // Append the new text to the last message content
-        return [
-          ...otherMessages,
-          { ...lastMessage, content: lastMessage.content + text },
-        ];
-      });
-    };
+  // Handles the file attachment event and adds the files to the attachments state.
+  const handleFileAttachment = (event) => {
+    const files = Array.from(event.target.files);
+    const pdfFiles = files.filter(file => file.type === 'application/pdf'); // Filter PDFs only
+    if (pdfFiles.length > 0) {
+      setAttachments([...attachments, ...pdfFiles.map(file => ({ type: 'file', content: file }))]);
+    }
+    handleAttachmentMenuClose();
+  };
 
-    // Handles the attachment button click event to open the attachment menu.
-    const handleAttachmentClick = (event) => {
-      event.stopPropagation(); // Prevent event bubbling
-      setAttachmentAnchorEl(event.currentTarget);
-    };
+  // Handles the link attachment event and adds the link to the attachments state.
+  const handleLinkAttachment = () => {
+    setLinkDialogOpen(true);
+    handleAttachmentMenuClose();
+  };
 
-    const handleAttachmentMenuClose = () => {
-      setAttachmentAnchorEl(null);
-    };
-    
-    // Handles the file attachment event and adds the files to the attachments state.
-    const handleFileAttachment = (event) => {
-      const files = Array.from(event.target.files);
-      setAttachments([...attachments, ...files.map(file => ({ type: 'file', content: file }))]);
-      handleAttachmentMenuClose();
-    };
+  // Handles the link input change event to update the link input state.
+  const handleLinkSubmit = () => {
+    if (linkInput.trim() && isDocumentationLink(linkInput.trim())) {
+      setAttachments([...attachments, { type: 'link', content: linkInput.trim() }]);
+      setLinkInput('');
+    }
+    setLinkDialogOpen(false);
+  };
 
-    // Handles the link attachment event and adds the link to the attachments state.
-    const handleLinkAttachment = () => {
-      setLinkDialogOpen(true);
-      handleAttachmentMenuClose();
-    };
-
-    // Handles the link input change event to update the link input state.
-    const handleLinkSubmit = () => {
-      if (linkInput.trim()) {
-        setAttachments([...attachments, { type: 'link', content: linkInput.trim() }]);
-        setLinkInput('');
-      }
-      setLinkDialogOpen(false);
-    };
+  const isDocumentationLink = (url) => {
+    // Basic check to identify if the URL points to documentation (you may want to enhance this logic)
+    return url.includes('github.com') || url.includes('docs') || url.endsWith('.pdf');
+  };
 
   // Handles any errors that occur during the fetch request.
   const handleError = (setMessages) => {
