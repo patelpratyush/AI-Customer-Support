@@ -1,20 +1,8 @@
 'use client'
 
 import React, { useState, useRef, useEffect } from 'react';
-import {
-  AppBar,
-  Toolbar,
-  Typography,
-  Button,
-  Container,
-  Box,
-  IconButton,
-  TextField,
-  Stack,
-  Grow,
-  Menu,
-  MenuItem,
-} from '@mui/material';
+import {AppBar, Toolbar, Typography, Button, Container, Box, IconButton, TextField, Stack, Grow, Menu, MenuItem, FormControl, 
+  InputLabel, Select} from '@mui/material';
 import { AccountCircle, Logout, Send } from '@mui/icons-material';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -34,10 +22,22 @@ const ChatPage = () => {
       content: "Hi there! I'm your coding companion. How can I assist you with your code today?",
     },
   ])
+
+   // Models for the dropdown
+   const models = [
+    { value: 'meta-llama/llama-3.1-8b-instruct:free', label: 'Llama 3.1' },
+    { value: 'qwen/qwen-2-7b-instruct:free', label: 'Qwen 2' },
+    { value: 'google/gemma-2-9b-it:free', label: 'Google: Gemma 2' },
+    { value: 'mistralai/mistral-7b-instruct:free', label: 'Mistral 7B' },
+    { value: 'microsoft/phi-3-mini-128k-instruct:free', label: 'Phi-3 Mini' },
+  ];
+
   // State to store the current message input by the user
   const [message, setMessage] = useState('');
   // State to indicate whether a message is being processed
   const [isLoading, setIsLoading] = useState(false);
+  // State to store the selected model
+  const [selectedModel, setSelectedModel] = useState(models[0].value); // Default model
   // State to track if the input should be at the bottom of the screen
   const [inputAtBottom, setInputAtBottom] = useState(false);
   const inputRef = useRef(null);
@@ -50,6 +50,10 @@ const ChatPage = () => {
   const [loading, setLoading] = useState(false);
   // Initialize router
   const router = useRouter();
+
+  const handleModelChange = (event) => {
+    setSelectedModel(event.target.value);
+  };
 
   const userandplaceholdermsg = (message, setMessages) => {
     setMessages((prevMessages) => [
@@ -111,7 +115,9 @@ const ChatPage = () => {
       const response = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([...messages, { role: 'user', content: message }]),
+        body: JSON.stringify({
+          messages:[...messages, { role: 'user', content: message }],
+          model: selectedModel,}),
       });
 
       // Check if the network response is OK
@@ -239,7 +245,6 @@ const ChatPage = () => {
                 autoComplete="off"
                 placeholder="Ask me anything..."
                 value={message}
-
                 onChange={(e) => setMessage(e.target.value)}
                 onKeyPress={handleKeyPress}
                 InputProps={{
@@ -282,6 +287,70 @@ const ChatPage = () => {
                 ref={inputRef}
               />
             </Box>
+            <Box sx={{ marginLeft: '-400px', marginTop: '10px'}}>
+              <FormControl sx={{ width: '200px', marginTop: '20px' }}>
+                  <InputLabel 
+                    id="model-select-label" 
+                    sx={{ 
+                      color: '#aaa', 
+                      '&.Mui-focused': { color: 'white' },
+                      '&.MuiInputLabel-shrink': { 
+                        transform: 'translate(14px, -17px) scale(0.75)',
+                        color: '#aaa',
+                      }
+                    }}
+                  >
+                    Select Model
+                  </InputLabel>
+                  <Select
+                    labelId="model-select-label"
+                    value={selectedModel}
+                    onChange={handleModelChange}
+                    label="Select Model"
+                    sx={{
+                      color: 'white',
+                      backgroundColor: '#333',
+                      borderRadius: '25px',
+                      '.MuiOutlinedInput-notchedOutline': { border: 'none' },
+                      '&:hover .MuiOutlinedInput-notchedOutline': { border: 'none' },
+                      '&.Mui-focused .MuiOutlinedInput-notchedOutline': { border: 'none' },
+                      '& .MuiSvgIcon-root': { color: 'white' },
+                      '& .MuiSelect-select': { 
+                        paddingTop: '10px', 
+                        paddingBottom: '10px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                      },
+                    }}
+                    MenuProps={{
+                      PaperProps: {
+                        sx: {
+                          bgcolor: '#333',
+                          '& .MuiMenuItem-root': {
+                            color: 'white',
+                            '&:hover': {
+                              bgcolor: '#444',
+                            },
+                            '&.Mui-selected': {
+                              bgcolor: '#555',
+                              '&:hover': {
+                                bgcolor: '#666',
+                              },
+                            },
+                          },
+                        },
+                      },
+                    }}
+                  >
+                    {models.map((model) => (
+                      <MenuItem key={model.value} value={model.value}>
+                        {model.label}
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+              </Box>
           </Container>
         ) : (
           // Chat state: Messages list and input at bottom
