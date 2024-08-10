@@ -2,8 +2,8 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import {AppBar, Toolbar, Typography, Button, Container, Box, IconButton, TextField, Stack, Grow, Menu, MenuItem, FormControl, 
-  InputLabel, Select} from '@mui/material';
-import { AccountCircle, Logout, Send } from '@mui/icons-material';
+  InputLabel, Select, IconBox, Dialog, DialogTitle, DialogContent, DialogActions} from '@mui/material';
+import { AccountCircle, Logout, Send, AttachFile, InsertDriveFile, Link } from '@mui/icons-material';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeHighlight from 'rehype-highlight';
@@ -48,6 +48,12 @@ const ChatPage = () => {
   // State to hold user UID
   const [userUid, setUserUid] = useState('');
   const [loading, setLoading] = useState(false);
+  // State to store the attachments uploaded by the user
+  const [attachmentAnchorEl, setAttachmentAnchorEl] = useState(null);
+  const [attachments, setAttachments] = useState([]);
+  const [linkDialogOpen, setLinkDialogOpen] = useState(false);
+  const [linkInput, setLinkInput] = useState('');
+  const fileInputRef = useRef(null);
   // Initialize router
   const router = useRouter();
 
@@ -89,7 +95,39 @@ const ChatPage = () => {
       });
     };
 
-    // Handles any errors that occur during the fetch request.
+    // Handles the attachment button click event to open the attachment menu.
+    const handleAttachmentClick = (event) => {
+      event.stopPropagation(); // Prevent event bubbling
+      setAttachmentAnchorEl(event.currentTarget);
+    };
+
+    const handleAttachmentMenuClose = () => {
+      setAttachmentAnchorEl(null);
+    };
+    
+    // Handles the file attachment event and adds the files to the attachments state.
+    const handleFileAttachment = (event) => {
+      const files = Array.from(event.target.files);
+      setAttachments([...attachments, ...files.map(file => ({ type: 'file', content: file }))]);
+      handleAttachmentMenuClose();
+    };
+
+    // Handles the link attachment event and adds the link to the attachments state.
+    const handleLinkAttachment = () => {
+      setLinkDialogOpen(true);
+      handleAttachmentMenuClose();
+    };
+
+    // Handles the link input change event to update the link input state.
+    const handleLinkSubmit = () => {
+      if (linkInput.trim()) {
+        setAttachments([...attachments, { type: 'link', content: linkInput.trim() }]);
+        setLinkInput('');
+      }
+      setLinkDialogOpen(false);
+    };
+
+  // Handles any errors that occur during the fetch request.
   const handleError = (setMessages) => {
     setMessages((prevMessages) => [
       ...prevMessages,
@@ -104,20 +142,30 @@ const ChatPage = () => {
   const sendMessage = async () => {
     // Prevent sending empty messages or if already loading
     if (!message.trim() || isLoading) return;
+    if (!message.trim() && attachments.length === 0) return;
     setIsLoading(true); // Set loading state to true
 
     // Add user message and a placeholder for the assistant's response
     userandplaceholdermsg(message, setMessages);
     setMessage(''); // Clear the input field
 
+    const formData = new FormData();
+    formData.append('message', message);
+    formData.append('model', selectedModel);
+    attachments.forEach((attachment, index) => {
+      if (attachment.type === 'file') {
+        formData.append(`file${index}`, attachment.content);
+      } else {
+        formData.append(`link${index}`, attachment.content);
+      }
+    });
+
     try {
       // Send the user message to the server
       const response = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          messages:[...messages, { role: 'user', content: message }],
-          model: selectedModel,}),
+        body: formData,
       });
 
       // Check if the network response is OK
@@ -129,6 +177,8 @@ const ChatPage = () => {
 
       // Process the server response stream
       await handleServerResponse(reader, decoder, setMessages);
+      setAttachments([]); // Clear the attachments after processing the response
+      
     } catch (error) {
       console.error('Error:', error);
 
@@ -249,9 +299,14 @@ const ChatPage = () => {
                 onKeyPress={handleKeyPress}
                 InputProps={{
                   endAdornment: (
-                    <IconButton>
-                      <Send style={{ color: 'white' }} />
-                    </IconButton>
+                    <>
+                      <IconButton onClick={handleAttachmentClick}>
+                        <AttachFile style={{ color: 'white' }} />
+                      </IconButton>
+                      <IconButton onClick={sendMessage} disabled={isLoading}>
+                        <Send style={{ color: 'white' }} />
+                      </IconButton>
+                    </>
                   ),
                 }}
                 fullWidth
@@ -286,6 +341,67 @@ const ChatPage = () => {
                 }}
                 ref={inputRef}
               />
+
+              <Menu
+                anchorEl={attachmentAnchorEl}
+                open={Boolean(attachmentAnchorEl)}
+                onClose={handleAttachmentMenuClose}
+                PaperProps={{
+                  style: {
+                    backgroundColor: '#1e1e1e',
+                    color: 'white',
+                  },
+                }}
+              >
+                <MenuItem onClick={() => fileInputRef.current.click()}>
+                  <InsertDriveFile style={{ marginRight: '8px' }} /> Attach File
+                </MenuItem>
+                <MenuItem onClick={handleLinkAttachment}>
+                  <Link style={{ marginRight: '8px' }} /> Attach Link
+                </MenuItem>
+              </Menu>
+
+              <input
+                type="file"
+                ref={fileInputRef}
+                style={{ display: 'none' }}
+                onChange={handleFileAttachment}
+                multiple
+              />
+
+              <Dialog 
+                open={linkDialogOpen} 
+                onClose={() => setLinkDialogOpen(false)}
+                PaperProps={{
+                  style: {
+                    backgroundColor: '#1e1e1e',
+                    color: 'white',
+                  },
+                }}
+              >
+                <DialogTitle>Attach Link</DialogTitle>
+                <DialogContent>
+                  <TextField
+                    autoFocus
+                    margin="dense"
+                    label="Link URL"
+                    type="url"
+                    fullWidth
+                    value={linkInput}
+                    onChange={(e) => setLinkInput(e.target.value)}
+                    InputLabelProps={{
+                      style: { color: '#b0b0b0' },
+                    }}
+                    InputProps={{
+                      style: { color: 'white' },
+                    }}
+                  />
+                </DialogContent>
+                <DialogActions>
+                  <Button onClick={() => setLinkDialogOpen(false)} style={{ color: 'white' }}>Cancel</Button>
+                  <Button onClick={handleLinkSubmit} style={{ color: 'white' }}>Attach</Button>
+                </DialogActions>
+              </Dialog>
             </Box>
             <Box sx={{ marginTop: '10px'}}>
               <FormControl sx={{ width: '150px', marginTop: '20px' }}>
