@@ -228,7 +228,7 @@ const ChatPage = () => {
           // Initial state: Landing page with welcome message and input box
           <Container maxWidth="md" style={{ textAlign: 'center' }}>
             <Typography variant="h3" component="h1" gutterBottom align="center" style={{ color: 'white' }} mt="15vh">
-              Customer Service with AI
+              Coding Help with AI
             </Typography>
             {/* <Typography variant="h5" paragraph align="center" style={{ color: '#b0b0b0' }}>
               Our AI-powered assistant is here to help you with all your customer service needs. Get instant answers and personalized support.
