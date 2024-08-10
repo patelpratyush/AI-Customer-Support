@@ -10,7 +10,6 @@ import numpy as np
 from dotenv import load_dotenv
 import tiktoken
 import os
-import warnings
 
 load_dotenv(dotenv_path='../../../.env.local')
 
