@@ -6,7 +6,9 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "backend": "sh scripts/start-backend.sh",
+    "dev:all": "concurrently \"npm run dev\" \"npm run backend\""
   },
   "dependencies": {
     "@emotion/react": "^11.13.0",
@@ -26,6 +28,7 @@
     "remark-gfm": "^4.0.0"
   },
   "devDependencies": {
+    "concurrently": "^8.2.2",
     "eslint": "^8",
     "eslint-config-next": "14.2.5"
   }

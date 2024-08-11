@@ -8,8 +8,7 @@ concise, and to the point. When providing code snippets, use Markdown formatting
 comments to explain the code in simple terms, focusing on readability and best practices. If a user provides code,
 automatically detect the programming language, check for errors, and suggest improvements. Avoid asking unnecessary
 questions unless clarification is needed. Your goal is to assist efficiently and effectively, guiding users towards
-optimal solutions.
-
+optimal solutions. Highlight areas where changes are made with comments for better readability.
 
 Examples:
 
@@ -62,37 +61,84 @@ const openai = new OpenAI({
   }
 });
 
-// POST function to handle incoming requests
+// // POST function to handle incoming requests
+// export async function POST(req) {
+//   const {messages , model} = await req.json(); // Parse the JSON body of the incoming request
+
+//   // Create a chat completion request to the OpenAI API via OpenRouter
+//   const completion = await openai.chat.completions.create({
+//     model: model || "meta-llama/llama-3.1-8b-instruct:free", // Specify the model to use
+//     messages: [{ role: 'system', content: systemPrompt }, ...messages], // Include the system prompt and user messages
+//     stream: true, // Enable streaming responses
+//   });
+
+//   // Create a ReadableStream to handle the streaming response
+//   const stream = new ReadableStream({
+//     async start(controller) {
+//       const encoder = new TextEncoder(); // Create a TextEncoder to convert strings to Uint8Array
+//       try {
+//         // Iterate over the streamed chunks of the response
+//         for await (const chunk of completion) {
+//           const content = chunk.choices[0]?.delta?.content; // Extract the content from the chunk
+//           if (content) {
+//             const text = encoder.encode(content); // Encode the content to Uint8Array
+//             controller.enqueue(text); // Enqueue the encoded text to the stream
+//           }
+//         }
+//       } catch (err) {
+//         controller.error(err); // Handle any errors that occur during streaming
+//       } finally {
+//         controller.close(); // Close the stream when done
+//       }
+//     },
+//   });
+
+//   return new NextResponse(stream); // Return the stream as the response
+// }
+
+// export async function POST(req) {
+//   const formData = await req.formData();
+//   const message = formData.get('message');
+//   const model = formData.get('model') || 'qwen/qwen-2-7b-instruct:free';
+  
+//   // Create a new FormData object to send to the Python API
+//   const apiFormData = new FormData();
+//   apiFormData.append('message', message);
+//   apiFormData.append('model', model);
+
+//   // Append files and links
+//   for (let [key, value] of formData.entries()) {
+//     if (key.startsWith('file') || key.startsWith('link')) {
+//       apiFormData.append(key, value);
+//     }
+//   }
+
+//   const response = await fetch('http://localhost:5000/api/chat', {
+//     method: 'POST',
+//     body: apiFormData,
+//   });
+
+//   if (!response.ok) {
+//     throw new Error('API request failed');
+//   }
+
+//   return new NextResponse(response.body);
+// }
+
 export async function POST(req) {
-  const {messages , model} = await req.json(); // Parse the JSON body of the incoming request
+  const data = await req.json();
 
-  // Create a chat completion request to the OpenAI API via OpenRouter
-  const completion = await openai.chat.completions.create({
-    model: model || "meta-llama/llama-3.1-8b-instruct:free", // Specify the model to use
-    messages: [{ role: 'system', content: systemPrompt }, ...messages], // Include the system prompt and user messages
-    stream: true, // Enable streaming responses
-  });
-
-  // Create a ReadableStream to handle the streaming response
-  const stream = new ReadableStream({
-    async start(controller) {
-      const encoder = new TextEncoder(); // Create a TextEncoder to convert strings to Uint8Array
-      try {
-        // Iterate over the streamed chunks of the response
-        for await (const chunk of completion) {
-          const content = chunk.choices[0]?.delta?.content; // Extract the content from the chunk
-          if (content) {
-            const text = encoder.encode(content); // Encode the content to Uint8Array
-            controller.enqueue(text); // Enqueue the encoded text to the stream
-          }
-        }
-      } catch (err) {
-        controller.error(err); // Handle any errors that occur during streaming
-      } finally {
-        controller.close(); // Close the stream when done
-      }
+  const response = await fetch('/api/chat', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
     },
+    body: JSON.stringify(data),
   });
 
-  return new NextResponse(stream); // Return the stream as the response
+  if (!response.ok) {
+    throw new Error('API request failed');
+  }
+
+  return new NextResponse(response.body);
 }

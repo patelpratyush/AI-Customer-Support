@@ -2,7 +2,7 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import {AppBar, Toolbar, Typography, Button, Container, Box, IconButton, TextField, Stack, Grow, Menu, MenuItem, FormControl, 
-  InputLabel, Select, IconBox, Dialog, DialogTitle, DialogContent, DialogActions} from '@mui/material';
+  InputLabel, Select, IconBox, Dialog, DialogTitle, DialogContent, DialogActions, Chip } from '@mui/material';
 import { AccountCircle, Logout, Send, AttachFile, InsertDriveFile, Link } from '@mui/icons-material';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -157,23 +157,29 @@ const ChatPage = () => {
     userandplaceholdermsg(message, setMessages);
     setMessage(''); // Clear the input field
 
-    const formData = new FormData();
-    formData.append('message', message);
-    formData.append('model', selectedModel);
-    attachments.forEach((attachment, index) => {
-      if (attachment.type === 'file') {
-        formData.append(`file${index}`, attachment.content);
-      } else {
-        formData.append(`link${index}`, attachment.content);
-      }
-    });
+    // const formData = new FormData();
+    // formData.append('message', message);
+    // formData.append('model', selectedModel);
+    // attachments.forEach((attachment, index) => {
+    //   if (attachment.type === 'file') {
+    //     formData.append(`file${index}`, attachment.content);
+    //   } else {
+    //     formData.append(`link${index}`, attachment.content);
+    //   }
+    // });
+
+    const data = {
+      message: message,
+      model: selectedModel,
+      links: attachments.filter(a => a.type === 'link').map(a => a.content)
+    };
 
     try {
       // Send the user message to the server
       const response = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: formData,
+        body: JSON.stringify(data),
       });
 
       // Check if the network response is OK
