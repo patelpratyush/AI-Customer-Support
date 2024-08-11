@@ -51,6 +51,7 @@ const ChatPage = () => {
   // State to store the attachments uploaded by the user
   const [attachmentAnchorEl, setAttachmentAnchorEl] = useState(null);
   const [attachments, setAttachments] = useState([]);
+  const [pendingAttachments, setPendingAttachments] = useState([]);
   const [linkDialogOpen, setLinkDialogOpen] = useState(false);
   const [linkInput, setLinkInput] = useState('');
   const fileInputRef = useRef(null);
@@ -108,10 +109,8 @@ const ChatPage = () => {
   // Handles the file attachment event and adds the files to the attachments state.
   const handleFileAttachment = (event) => {
     const files = Array.from(event.target.files);
-    const pdfFiles = files.filter(file => file.type === 'application/pdf'); // Filter PDFs only
-    if (pdfFiles.length > 0) {
-      setAttachments([...attachments, ...pdfFiles.map(file => ({ type: 'file', content: file }))]);
-    }
+    const newAttachments = files.map(file => ({ type: 'file', content: file }));
+    setPendingAttachments(prevAttachments => [...prevAttachments, ...newAttachments]);
     handleAttachmentMenuClose();
   };
 
@@ -124,7 +123,10 @@ const ChatPage = () => {
   // Handles the link input change event to update the link input state.
   const handleLinkSubmit = () => {
     if (linkInput.trim() && isDocumentationLink(linkInput.trim())) {
-      setAttachments([...attachments, { type: 'link', content: linkInput.trim() }]);
+      setPendingAttachments(prevAttachments => [
+        ...prevAttachments,
+        { type: 'link', content: linkInput.trim() }
+      ]);
       setLinkInput('');
     }
     setLinkDialogOpen(false);
@@ -147,60 +149,101 @@ const ChatPage = () => {
   };
 
   // Sends the user's message to the server and processes the response.
+  // const sendMessage = async () => {
+  //   // Prevent sending empty messages or if already loading
+  //   if ((!message.trim() && attachments.length === 0) || isLoading) return;
+  //   setIsLoading(true); // Set loading state to true
+
+  //   // Add user message and a placeholder for the assistant's response
+  //   userandplaceholdermsg(message, setMessages);
+  //   setMessage(''); // Clear the input field
+
+  //   const formData = new FormData();
+  //   formData.append('message', message);
+  //   formData.append('model', selectedModel);
+  //   attachments.forEach((attachment, index) => {
+  //     if (attachment.type === 'file') {
+  //       formData.append(`file${index}`, attachment.content);
+  //     } else {
+  //       formData.append(`link${index}`, attachment.content);
+  //     }
+  //   });
+
+  //   const data = {
+  //     message: message,
+  //     model: selectedModel,
+  //     links: attachments.filter(a => a.type === 'link').map(a => a.content)
+  //   };
+
+  //   try {
+  //     // Send the user message to the server
+  //     const response = await fetch('/api/chat', {
+  //       method: 'POST',
+  //       headers: { 'Content-Type': 'application/json' },
+  //       body: JSON.stringify(data),
+  //     });
+
+  //     // Check if the network response is OK
+  //     if (!response.ok) throw new Error('Network response was not ok');
+
+  //     // Read and decode the stream of data from the server
+  //     const reader = response.body.getReader();
+  //     const decoder = new TextDecoder();
+
+  //     // Process the server response stream
+  //     await handleServerResponse(reader, decoder, setMessages);
+  //     setAttachments([]); // Clear the attachments after processing the response
+      
+  //   } catch (error) {
+  //     console.error('Error:', error);
+
+  //     // Handle any errors by displaying an error message
+  //     handleError(setMessages);
+  //   }
+
+  //   setIsLoading(false); // Reset loading state to false
+  // };
+
   const sendMessage = async () => {
-    // Prevent sending empty messages or if already loading
-    if (!message.trim() || isLoading) return;
-    if (!message.trim() && attachments.length === 0) return;
-    setIsLoading(true); // Set loading state to true
+    if ((!message.trim() && pendingAttachments.length === 0) || isLoading) return;
+    setIsLoading(true);
 
-    // Add user message and a placeholder for the assistant's response
-    userandplaceholdermsg(message, setMessages);
-    setMessage(''); // Clear the input field
+    const newMessage = {
+      role: 'user',
+      content: message,
+      attachments: pendingAttachments
+    };
 
-    // const formData = new FormData();
-    // formData.append('message', message);
-    // formData.append('model', selectedModel);
-    // attachments.forEach((attachment, index) => {
-    //   if (attachment.type === 'file') {
-    //     formData.append(`file${index}`, attachment.content);
-    //   } else {
-    //     formData.append(`link${index}`, attachment.content);
-    //   }
-    // });
+    setMessages(prevMessages => [...prevMessages, newMessage, { role: 'assistant', content: '' }]);
+    setMessage('');
+    setPendingAttachments([]);
 
     const data = {
       message: message,
       model: selectedModel,
-      links: attachments.filter(a => a.type === 'link').map(a => a.content)
+      attachments: pendingAttachments
     };
 
     try {
-      // Send the user message to the server
       const response = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data),
       });
 
-      // Check if the network response is OK
       if (!response.ok) throw new Error('Network response was not ok');
 
-      // Read and decode the stream of data from the server
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
 
-      // Process the server response stream
       await handleServerResponse(reader, decoder, setMessages);
-      setAttachments([]); // Clear the attachments after processing the response
-      
+      setAttachments([]);
     } catch (error) {
       console.error('Error:', error);
-
-      // Handle any errors by displaying an error message
       handleError(setMessages);
     }
 
-    setIsLoading(false); // Reset loading state to false
+    setIsLoading(false);
   };
 
   const handleKeyPress = (event) => {
@@ -252,6 +295,67 @@ const ChatPage = () => {
     return () => unsubscribe(); // Cleanup subscription on unmount
   }, []);
 
+  const renderInputField = () => (
+    <Box sx={{ width: '100%', maxWidth: '600px' }}>
+      {pendingAttachments.length > 0 && (
+        <Box sx={{ marginBottom: '8px', display: 'flex', flexWrap: 'wrap' }}>
+          {pendingAttachments.map((attachment, index) => (
+            <Chip
+              key={index}
+              label={attachment.type === 'file' ? attachment.content.name : 'Link: ' + attachment.content}
+              onDelete={() => {
+                setPendingAttachments(prevAttachments => 
+                  prevAttachments.filter((_, i) => i !== index)
+                );
+              }}
+              sx={{
+                marginRight: '4px',
+                marginBottom: '4px',
+                backgroundColor: '#555',
+                color: 'white',
+              }}
+            />
+          ))}
+        </Box>
+      )}
+      <TextField
+        variant="outlined"
+        placeholder="Ask me anything..."
+        value={message}
+        onChange={(e) => setMessage(e.target.value)}
+        onKeyPress={handleKeyPress}
+        InputProps={{
+          endAdornment: (
+            <>
+              <IconButton onClick={handleAttachmentClick}>
+                <AttachFile style={{ color: 'white' }} />
+              </IconButton>
+              <IconButton onClick={sendMessage} disabled={isLoading}>
+                <Send style={{ color: 'white' }} />
+              </IconButton>
+            </>
+          ),
+        }}
+        fullWidth
+        sx={{
+          backgroundColor: '#333',
+          color: 'white',
+          borderRadius: '50px',
+          '& .MuiOutlinedInput-root': {
+            borderRadius: '50px',
+            '& fieldset': { borderColor: '#555' },
+            '&:hover fieldset': { borderColor: '#777' },
+            '&.Mui-focused fieldset': { borderColor: 'white' },
+          },
+          '& .MuiInputBase-input': { color: 'white' },
+          '& .MuiInputLabel-root': { color: '#aaa' },
+          '& .MuiInputLabel-root.Mui-focused': { color: 'white' },
+        }}
+        ref={inputRef}
+      />
+    </Box>
+  );
+
   return (
     // Main container with dark background
     <div style={{ height: '100vh', display: 'flex', flexDirection: 'column', backgroundColor: '#121212', color: 'white' }}>
@@ -295,261 +399,143 @@ const ChatPage = () => {
       {/* Main content area */}
       <main style={{ flex: 1, display: 'flex', flexDirection: 'column', paddingBottom: '55px' }}>
         {!inputAtBottom ? (
-          // Initial state: Landing page with welcome message and input box
           <Container maxWidth="md" style={{ textAlign: 'center' }}>
             <Typography variant="h3" component="h1" gutterBottom align="center" style={{ color: 'white' }} mt="15vh">
               Coding Help with AI
             </Typography>
-            {/* <Typography variant="h5" paragraph align="center" style={{ color: '#b0b0b0' }}>
-              Our AI-powered assistant is here to help you with all your customer service needs. Get instant answers and personalized support.
-            </Typography> */}
             <Box mt={4} display="flex" justifyContent="center">
-              <TextField
-                variant="outlined"
-                autoComplete="off"
-                placeholder="Ask me anything..."
-                value={message}
-                onChange={(e) => setMessage(e.target.value)}
-                onKeyPress={handleKeyPress}
-                InputProps={{
-                  endAdornment: (
-                    <>
-                      <IconButton onClick={handleAttachmentClick}>
-                        <AttachFile style={{ color: 'white' }} />
-                      </IconButton>
-                      <IconButton onClick={sendMessage} disabled={isLoading}>
-                        <Send style={{ color: 'white' }} />
-                      </IconButton>
-                    </>
-                  ),
-                }}
-                fullWidth
-                sx={{
-                  backgroundColor: '#333',
-                  color: 'white',
-                  borderRadius: '50px',
-                  width: '600px', // Set a fixed width
-
-                  '& .MuiOutlinedInput-root': {
-                    borderRadius: '50px',
-
-                    '& fieldset': {
-                      borderColor: '#555',
-                    },
-                    '&:hover fieldset': {
-                      borderColor: '#777',
-                    },
-                    '&.Mui-focused fieldset': {
-                      borderColor: 'white',
-                    },
-                  },
-                  '& .MuiInputBase-input': {
-                    color: 'white',
-                  },
-                  '& .MuiInputLabel-root': {
-                    color: '#aaa',
-                  },
-                  '& .MuiInputLabel-root.Mui-focused': {
-                    color: 'white',
-                  },
-                }}
-                ref={inputRef}
-              />
-
-              <Menu
-                anchorEl={attachmentAnchorEl}
-                open={Boolean(attachmentAnchorEl)}
-                onClose={handleAttachmentMenuClose}
-                PaperProps={{
-                  style: {
-                    backgroundColor: '#1e1e1e',
-                    color: 'white',
-                  },
-                }}
-              >
-                <MenuItem onClick={() => fileInputRef.current.click()}>
-                  <InsertDriveFile style={{ marginRight: '8px' }} /> Attach File
-                </MenuItem>
-                <MenuItem onClick={handleLinkAttachment}>
-                  <Link style={{ marginRight: '8px' }} /> Attach Link
-                </MenuItem>
-              </Menu>
-
-              <input
-                type="file"
-                ref={fileInputRef}
-                style={{ display: 'none' }}
-                onChange={handleFileAttachment}
-                multiple
-              />
-
-              <Dialog 
-                open={linkDialogOpen} 
-                onClose={() => setLinkDialogOpen(false)}
-                PaperProps={{
-                  style: {
-                    backgroundColor: '#1e1e1e',
-                    color: 'white',
-                  },
-                }}
-              >
-                <DialogTitle>Attach Link</DialogTitle>
-                <DialogContent>
-                  <TextField
-                    autoFocus
-                    margin="dense"
-                    label="Link URL"
-                    type="url"
-                    fullWidth
-                    value={linkInput}
-                    onChange={(e) => setLinkInput(e.target.value)}
-                    InputLabelProps={{
-                      style: { color: '#b0b0b0' },
-                    }}
-                    InputProps={{
-                      style: { color: 'white' },
-                    }}
-                  />
-                </DialogContent>
-                <DialogActions>
-                  <Button onClick={() => setLinkDialogOpen(false)} style={{ color: 'white' }}>Cancel</Button>
-                  <Button onClick={handleLinkSubmit} style={{ color: 'white' }}>Attach</Button>
-                </DialogActions>
-              </Dialog>
+              {renderInputField()}
             </Box>
-            <Box sx={{ marginTop: '10px'}}>
+            <Box sx={{ marginTop: '10px' }}>
               <FormControl sx={{ width: '150px', marginTop: '20px' }}>
-                  <InputLabel 
-                    id="model-select-label" 
-                    sx={{ 
-                      color: '#aaa', 
-                      '&.Mui-focused': { color: 'white' },
-                      '&.MuiInputLabel-shrink': { 
-                        transform: 'translate(14px, -17px) scale(0.75)',
-                        color: '#aaa',
-                      }
-                    }}
-                  >
-                    Select Model
-                  </InputLabel>
-                  <Select
-                    labelId="model-select-label"
-                    value={selectedModel}
-                    onChange={handleModelChange}
-                    label="Select Model"
-                    sx={{
-                      color: 'white',
-                      backgroundColor: '#333',
-                      borderRadius: '25px',
-                      '.MuiOutlinedInput-notchedOutline': { border: 'none' },
-                      '&:hover .MuiOutlinedInput-notchedOutline': { border: 'none' },
-                      '&.Mui-focused .MuiOutlinedInput-notchedOutline': { border: 'none' },
-                      '& .MuiSvgIcon-root': { color: 'white' },
-                      '& .MuiSelect-select': { 
-                        paddingTop: '10px', 
-                        paddingBottom: '10px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                      },
-                    }}
-                    MenuProps={{
-                      PaperProps: {
-                        sx: {
-                          bgcolor: '#333',
-                          '& .MuiMenuItem-root': {
-                            color: 'white',
+                <InputLabel 
+                  id="model-select-label" 
+                  sx={{ 
+                    color: '#aaa', 
+                    '&.Mui-focused': { color: 'white' },
+                    '&.MuiInputLabel-shrink': { 
+                      transform: 'translate(14px, -17px) scale(0.75)',
+                      color: '#aaa',
+                    }
+                  }}
+                >
+                  Select Model
+                </InputLabel>
+                <Select
+                  labelId="model-select-label"
+                  value={selectedModel}
+                  onChange={handleModelChange}
+                  label="Select Model"
+                  sx={{
+                    color: 'white',
+                    backgroundColor: '#333',
+                    borderRadius: '25px',
+                    '.MuiOutlinedInput-notchedOutline': { border: 'none' },
+                    '&:hover .MuiOutlinedInput-notchedOutline': { border: 'none' },
+                    '&.Mui-focused .MuiOutlinedInput-notchedOutline': { border: 'none' },
+                    '& .MuiSvgIcon-root': { color: 'white' },
+                    '& .MuiSelect-select': { 
+                      paddingTop: '10px', 
+                      paddingBottom: '10px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    },
+                  }}
+                  MenuProps={{
+                    PaperProps: {
+                      sx: {
+                        bgcolor: '#333',
+                        '& .MuiMenuItem-root': {
+                          color: 'white',
+                          '&:hover': {
+                            bgcolor: '#444',
+                          },
+                          '&.Mui-selected': {
+                            bgcolor: '#555',
                             '&:hover': {
-                              bgcolor: '#444',
-                            },
-                            '&.Mui-selected': {
-                              bgcolor: '#555',
-                              '&:hover': {
-                                bgcolor: '#666',
-                              },
+                              bgcolor: '#666',
                             },
                           },
                         },
                       },
-                    }}
-                  >
-                    {models.map((model) => (
-                      <MenuItem key={model.value} value={model.value}>
-                        {model.label}
-                      </MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
-              </Box>
+                    },
+                  }}
+                >
+                  {models.map((model) => (
+                    <MenuItem key={model.value} value={model.value}>
+                      {model.label}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+            </Box>
           </Container>
         ) : (
-          // Chat state: Messages list and input at bottom
           <Box sx={{ display: 'flex', flexDirection: 'column', flexGrow: 1, width: '100%' }}>
-            <Box
-              sx={{
-                display: 'flex',
-                flexDirection: 'column',
-                flexGrow: 1,
-                maxWidth: 'md',
-                margin: '0 auto',
-                padding: 2,
-                overflowY: 'auto',
-                height: 'calc(100vh - 120px)', // Adjust height to fit messages container
-                '&::-webkit-scrollbar': {
-                  width: '8px',
-                  background: 'transparent',
-                },
-                '&::-webkit-scrollbar-track': {
-                  background: 'transparent',
-                },
-                '&::-webkit-scrollbar-thumb': {
-                  background: 'transparent',
-                  borderRadius: '10px',
-                  transition: 'background 5s ease', /* Add transition effect */
-                },
-                '&::-webkit-scrollbar-thumb:hover': {
-                  background: 'rgba(255, 255, 255, 0.2)',
-                },
-              }}
-            >
+            <Box sx={{
+              display: 'flex',
+              flexDirection: 'column',
+              flexGrow: 1,
+              maxWidth: 'md',
+              margin: '0 auto',
+              padding: 2,
+              overflowY: 'auto',
+              height: 'calc(100vh - 120px)',
+              '&::-webkit-scrollbar': { width: '8px', background: 'transparent' },
+              '&::-webkit-scrollbar-track': { background: 'transparent' },
+              '&::-webkit-scrollbar-thumb': {
+                background: 'transparent',
+                borderRadius: '10px',
+                transition: 'background 5s ease',
+              },
+              '&::-webkit-scrollbar-thumb:hover': { background: 'rgba(255, 255, 255, 0.2)' },
+            }}>
               <Stack direction="column" spacing={2}>
                 {messages.map((msg, index) => (
-                  <Box
-                    key={index}
-                    sx={{
-                      maxWidth: '80%',
-                      borderRadius: '20px',
-                      padding: 2,
-                      marginBottom: 1,
-                      color: 'white',
-                      backgroundColor: msg.role === 'assistant' ? '#333' : '#1e1e1e',
-                      alignSelf: msg.role === 'assistant' ? 'flex-start' : 'flex-end',
-                      overflowWrap: 'break-word',
-                      lineHeight: '1.5', // Increased line-height for better readability
-                      // Markdown specific styles
-                      '& p': {
-                        marginBottom: '0px', // Space between paragraphs
-                      },
-                      '& ul, & ol': {
-                        marginLeft: '2em', // Space before list items
-                      },
-                      '& code': {
-                        backgroundColor: 'rgba(100,100,100,0.1)', // Change this to update background color of code blocks
-                        padding: '0.2em 0.4em',
-                        borderRadius: '4px',
-                        fontSize: '0.9em',
-                        // border: 1px solid ${currentTheme.palette.divider},
-                      },
-                      '& pre': {
-                        padding: '1em',
-                        borderRadius: '4px',
-                        overflowX: 'auto',
-                        whiteSpace: 'pre-wrap',
-                        marginBottom: '0.5em',
-                        // border: 1px solid ${currentTheme.palette.divider},
-                      }
-                    }}
-                  >
+                  <Box key={index} sx={{
+                    maxWidth: '80%',
+                    borderRadius: '20px',
+                    padding: 2,
+                    marginBottom: 1,
+                    color: 'white',
+                    backgroundColor: msg.role === 'assistant' ? '#333' : '#1e1e1e',
+                    alignSelf: msg.role === 'assistant' ? 'flex-start' : 'flex-end',
+                    overflowWrap: 'break-word',
+                    lineHeight: '1.5',
+                    '& p': { marginBottom: '0px' },
+                    '& ul, & ol': { marginLeft: '2em' },
+                    '& code': {
+                      backgroundColor: 'rgba(100,100,100,0.1)',
+                      padding: '0.2em 0.4em',
+                      borderRadius: '4px',
+                      fontSize: '0.9em',
+                    },
+                    '& pre': {
+                      padding: '1em',
+                      borderRadius: '4px',
+                      overflowX: 'auto',
+                      whiteSpace: 'pre-wrap',
+                      marginBottom: '0.5em',
+                    }
+                  }}>
+                    {msg.attachments && msg.attachments.length > 0 && (
+                      <Box sx={{ marginBottom: '8px' }}>
+                        {msg.attachments.map((attachment, attachmentIndex) => (
+                          <Chip
+                            key={attachmentIndex}
+                            label={attachment.type === 'file' ? attachment.content.name : 'Link: ' + attachment.content}
+                            size="small"
+                            sx={{
+                              marginRight: '4px',
+                              marginBottom: '4px',
+                              backgroundColor: '#555',
+                              color: 'white',
+                            }}
+                          />
+                        ))}
+                      </Box>
+                    )}
                     <ReactMarkdown
                       remarkPlugins={[remarkGfm]}
                       rehypePlugins={[rehypeHighlight]}
@@ -563,77 +549,93 @@ const ChatPage = () => {
                     </ReactMarkdown>
                   </Box>
                 ))}
-                {/* Reference to scroll to the bottom */}
                 <div ref={messagesEndRef} />
               </Stack>
             </Box>
 
-            {/* Input box at the bottom */}
             <Grow in={inputAtBottom} timeout={500}>
-              <Box
-                sx={{
-                  display: 'flex',
-                  justifyContent: 'center',
-                  position: 'fixed',
-                  bottom: 0,
-                  left: 0,
-                  right: 0,
-                  padding: 2,
-                  width: '100%', // Ensure the box stretches across the full width
-                  transition: 'transform 0.5s ease-in-out', // Use transform for smoother transition
-                  transform: inputAtBottom ? 'translateY(0)' : 'translateY(100%)', // Apply the transform for smooth movement
-                  zIndex: 1,
-                  backgroundColor: '#121212',
-                }}
-              >
-                <TextField
-                  variant="outlined"
-                  placeholder="Ask me anything..."
-                  value={message}
-                  onChange={(e) => setMessage(e.target.value)}
-                  onKeyPress={handleKeyPress}
-                  InputProps={{
-                    endAdornment: (
-                      <IconButton onClick={sendMessage} disabled={isLoading}>
-                        <Send style={{ color: '#121212' }} />
-                      </IconButton>
-                    ),
-                  }}
-                  fullWidth
-                  sx={{
-                    backgroundColor: '#333',
-                    color: 'white',
-                    borderRadius: '50px',
-                    width: '600px', // Set a fixed width
-                    '& .MuiOutlinedInput-root': {
-                      borderRadius: '50px',
-                      '& fieldset': {
-                        borderColor: '#555',
-                      },
-                      '&:hover fieldset': {
-                        borderColor: '#777',
-                      },
-                      '&.Mui-focused fieldset': {
-                        borderColor: 'white',
-                      },
-                    },
-                    '& .MuiInputBase-input': {
-                      color: 'white',
-                    },
-                    '& .MuiInputLabel-root': {
-                      color: '#aaa',
-                    },
-                    '& .MuiInputLabel-root.Mui-focused': {
-                      color: 'white',
-                    },
-                  }}
-                  ref={inputRef}
-                />
+              <Box sx={{
+                display: 'flex',
+                justifyContent: 'center',
+                position: 'fixed',
+                bottom: 0,
+                left: 0,
+                right: 0,
+                padding: 2,
+                width: '100%',
+                transition: 'transform 0.5s ease-in-out',
+                transform: inputAtBottom ? 'translateY(0)' : 'translateY(100%)',
+                zIndex: 1,
+                backgroundColor: '#121212',
+              }}>
+                {renderInputField()}
               </Box>
             </Grow>
           </Box>
         )}
       </main>
+
+      <Menu
+        anchorEl={attachmentAnchorEl}
+        open={Boolean(attachmentAnchorEl)}
+        onClose={handleAttachmentMenuClose}
+        PaperProps={{
+          style: {
+            backgroundColor: '#1e1e1e',
+            color: 'white',
+          },
+        }}
+      >
+        <MenuItem onClick={() => fileInputRef.current.click()}>
+          <InsertDriveFile style={{ marginRight: '8px' }} /> Attach File
+        </MenuItem>
+        <MenuItem onClick={handleLinkAttachment}>
+          <Link style={{ marginRight: '8px' }} /> Attach Link
+        </MenuItem>
+      </Menu>
+
+      <input
+        type="file"
+        ref={fileInputRef}
+        style={{ display: 'none' }}
+        onChange={handleFileAttachment}
+        multiple
+      />
+
+      <Dialog 
+        open={linkDialogOpen} 
+        onClose={() => setLinkDialogOpen(false)}
+        PaperProps={{
+          style: {
+            backgroundColor: '#1e1e1e',
+            color: 'white',
+          },
+        }}
+      >
+        <DialogTitle>Attach Link</DialogTitle>
+        <DialogContent>
+          <TextField
+            autoFocus
+            margin="dense"
+            label="Link URL"
+            type="url"
+            fullWidth
+            value={linkInput}
+            onChange={(e) => setLinkInput(e.target.value)}
+            InputLabelProps={{
+              style: { color: '#b0b0b0' },
+            }}
+            InputProps={{
+              style: { color: 'white' },
+            }}
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setLinkDialogOpen(false)} style={{ color: 'white' }}>Cancel</Button>
+          <Button onClick={handleLinkSubmit} style={{ color: 'white' }}>Attach</Button>
+        </DialogActions>
+      </Dialog>
+
       <Analytics />
     </div>
   );
