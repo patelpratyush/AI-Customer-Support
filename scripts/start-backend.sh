@@ -1,3 +1,8 @@
+# # Load environment variables from .env.local
+# if [ -f ".env.local" ]; then
+#   export $(grep -v '^#' .env.local | xargs)
+# fi
+
 if [ -d "venv" ]; then
   echo "Activating existing virtual environment..."
   . venv/bin/activate

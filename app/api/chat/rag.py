@@ -17,9 +17,10 @@ import os
 load_dotenv(dotenv_path='../../../.env.local')
 
 class RAG:
-    def __init__(self):
+    def __init__(self, pinecone_api_key=None):
         # Initialize API keys
-        self.pinecone_api_key = os.getenv('PINECONE_API_KEY')
+        self.pinecone_api_key = pinecone_api_key or os.getenv('PINECONE_API_KEY')
+        print(f"Pinecone API Key: {self.pinecone_api_key}")
         self.openai_api_key = os.getenv('OPENAI_API_KEY')
         self.openrouter_api_key = os.getenv('OPENROUTER_API_KEY')
         self.huggingface_api_token = os.getenv('HUGGINGFACE_API_TOKEN')
@@ -146,7 +147,7 @@ class RAG:
         augmented_query = "\n" + "\n\n-------\n\n".join(contexts[:10]) + "\n-------\n\n\n\n\nMY QUESTION:\n" + query
         
         # Modify the prompt below as needed to improve the response quality
-        system_prompt = """You are an expert personal assistant. Answer any questions I have about the Youtube Video provided. You always answer questions based only on the context that you have been provided."""
+        system_prompt = """You are an expert personal assistant. Answer any questions I have about the code provided. You always answer questions based only on the context that you have been provided."""
         
         res = self.openrouter_client.chat.completions.create(
             model=model,

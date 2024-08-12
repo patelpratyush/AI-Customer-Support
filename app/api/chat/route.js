@@ -133,6 +133,7 @@ export async function POST(req) {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        'X-Pinecone-API-Key': process.env.PINECONE_API_KEY,
       },
       body: JSON.stringify(data),
     });

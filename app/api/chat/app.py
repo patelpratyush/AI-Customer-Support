@@ -20,6 +20,12 @@ def chat():
         files = request.files.getlist('file')
         links = request.form.getlist('link')
 
+        # Get Pinecone API key from request headers
+        pinecone_api_key = request.headers.get('X-Pinecone-API-Key')
+        
+        # Reinitialize RAG with the new API key
+        rag = RAG(pinecone_api_key=pinecone_api_key)
+
         # Process attachments
         texts = []
         for file in files:
