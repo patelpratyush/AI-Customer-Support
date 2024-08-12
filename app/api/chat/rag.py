@@ -45,19 +45,9 @@ class RAG:
             length_function=self.tiktoken_len,
             separators=["\n\n", "\n", " ", ""]
         )
-
-        # Debugging: Print before initializing Pinecone
-        print("Initializing Pinecone...")
-
-        # Initialize Pinecone
-        try:
-            self.pinecone = Pinecone(api_key=self.pinecone_api_key, user_agent=self.user_agent)
-            print("Pinecone initialized successfully.")
-        except Exception as e:
-            print(f"Error initializing Pinecone: {e}")
         
         # Initialize Pinecone
-        # self.pinecone = Pinecone(api_key=self.pinecone_api_key, user_agent=self.user_agent)
+        self.pinecone = Pinecone(api_key=self.pinecone_api_key, user_agent=self.user_agent)
         self.index_name = "code-assistant"
         self.namespace = "documentation"    
         self.vectorstore = None
@@ -95,40 +85,40 @@ class RAG:
         texts = self.text_splitter.split_documents(data)
         return texts
     
-    def crawl_website(self, url, max_pages=10):
-        visited = set()
-        to_visit = [url]
-        base_domain = urlparse(url).netloc
-        texts = []
+    # def crawl_website(self, url, max_pages=10):
+    #     visited = set()
+    #     to_visit = [url]
+    #     base_domain = urlparse(url).netloc
+    #     texts = []
 
-        while to_visit and len(visited) < max_pages:
-            current_url = to_visit.pop(0)
-            if current_url in visited:
-                continue
+    #     while to_visit and len(visited) < max_pages:
+    #         current_url = to_visit.pop(0)
+    #         if current_url in visited:
+    #             continue
 
-            try:
-                response = requests.get(current_url)
-                soup = BeautifulSoup(response.text, 'html.parser')
+    #         try:
+    #             response = requests.get(current_url)
+    #             soup = BeautifulSoup(response.text, 'html.parser')
                 
-                # Extract text from the page
-                text = soup.get_text()
-                texts.extend(self.text_splitter.split_text(text))
+    #             # Extract text from the page
+    #             text = soup.get_text()
+    #             texts.extend(self.text_splitter.split_text(text))
 
-                # Find links
-                for link in soup.find_all('a', href=True):
-                    href = link['href']
-                    full_url = urljoin(current_url, href)
-                    if urlparse(full_url).netloc == base_domain and full_url not in visited:
-                        to_visit.append(full_url)
+    #             # Find links
+    #             for link in soup.find_all('a', href=True):
+    #                 href = link['href']
+    #                 full_url = urljoin(current_url, href)
+    #                 if urlparse(full_url).netloc == base_domain and full_url not in visited:
+    #                     to_visit.append(full_url)
 
-                visited.add(current_url)
-            except Exception as e:
-                print(f"Error crawling {current_url}: {str(e)}")
+    #             visited.add(current_url)
+    #         except Exception as e:
+    #             print(f"Error crawling {current_url}: {str(e)}")
 
-        return texts
+    #     return texts
 
-    def load_web_content(self, url):
-        return self.crawl_website(url)
+    # def load_web_content(self, url):
+    #     return self.crawl_website(url)
 
     def setup_vectorstore(self, texts):
         """Set up the Pinecone vector store with the given texts."""

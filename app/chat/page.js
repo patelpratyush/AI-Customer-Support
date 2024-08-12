@@ -134,7 +134,7 @@ const ChatPage = () => {
 
   const isDocumentationLink = (url) => {
     // Basic check to identify if the URL points to documentation (you may want to enhance this logic)
-    return url.includes('github.com') || url.includes('docs') || url.endsWith('.pdf');
+    return url.includes('.com') || url.includes('docs') || url.endsWith('.pdf');
   };
 
   // Handles any errors that occur during the fetch request.

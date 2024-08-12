@@ -1,21 +1,19 @@
-#!/bin/sh
-
-# Check if a virtual environment exists
 if [ -d "venv" ]; then
-  echo "Activating virtual environment..."
+  echo "Activating existing virtual environment..."
   . venv/bin/activate
-elif command -v conda &> /dev/null; then
-  echo "Activating conda environment..."
-  
-  # Check if conda is initialized
-  if ! grep -q "conda initialize" ~/.bashrc; then
-    conda init
-  fi
-  
-  conda activate chatbot3
 else
-  echo "No virtual environment found. Please create one using 'python -m venv venv' or 'conda create -n chatbot3 python=3.10.4'"
-  exit 1
+  echo "Creating a new virtual environment..."
+  python3 -m venv venv
+  . venv/bin/activate
+  
+  echo "Installing requirements..."
+  pip install --upgrade pip
+  if [ -f "requirements.txt" ]; then
+    pip install -r requirements.txt
+  else
+    echo "No requirements.txt found. Please provide a requirements file."
+    exit 1
+  fi
 fi
 
 # Run the Python script
