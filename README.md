@@ -73,7 +73,7 @@ To get a local copy up and running, follow these steps:
 2. **Navigate to the project directory:**
 
 ```bash
-    cd Inventory-Management
+    cd AI-Customer-Support
 ```
 
 3. **Install dependencies**
