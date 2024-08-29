@@ -1,6 +1,6 @@
-# Customer Service AI 
+# CodeBuddy
 
-Welcome to the Customer Service AI project! This repository contains an AI assistant that provides coding help and support through an intuitive and efficient interface.
+Welcome to the CodeBuddy! This repository contains an AI assistant that provides coding help and support through an intuitive and efficient interface.
 
 ## Features
 
